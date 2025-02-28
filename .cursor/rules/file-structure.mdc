@@ -1,0 +1,112 @@
+---
+description: File structure to organize project files for containerization and packaging for deployment. Follow this format to keep github version control organized
+globs: 
+alwaysApply: false
+---
+Atheon-AI/
+│── backend/                 # Backend Services (Python, Go, Rust)
+│   ├── orchestrator/        # Vertical Agent (Task Manager)
+│   │   ├── src/             
+│   │   │   ├── __init__.py  # Package Init
+│   │   │   ├── main.py      # Entry Point
+│   │   │   ├── routes.py    # API Endpoints
+│   │   │   ├── tasks.py     # Task Breakdown Logic
+│   │   │   ├── ai_agent.py  # AI Execution
+│   │   │   ├── hitl.py      # Human-in-the-Loop Handling
+│   │   │   ├── config.py    # App Configurations
+│   │   │   ├── utils.py     # Utility Functions
+│   │   ├── tests/           # Test Cases
+│   │   │   ├── test_tasks.py 
+│   │   │   ├── test_hitl.py
+│   │   ├── requirements.txt # Python Dependencies
+│   │   ├── Dockerfile       # Containerization
+│   │   ├── .env.example     # Environment Variables Example
+│   ├── agents/              # Horizontal Agents
+│   │   ├── scraper/         # Web Scraping (Go)
+│   │   │   ├── main.go      # Scraper Logic
+│   │   │   ├── scraper.go   # Web Scraping Implementation
+│   │   │   ├── config.go    # Configuration Settings
+│   │   │   ├── go.mod       # Go Dependencies
+│   │   │   ├── Dockerfile   # Containerization
+│   │   ├── data_fetcher/    # API Fetching (Rust)
+│   │   │   ├── src/
+│   │   │   │   ├── main.rs  # API Fetching Logic
+│   │   │   │   ├── config.rs
+│   │   │   │   ├── utils.rs
+│   │   │   ├── Cargo.toml   # Rust Dependencies
+│   │   │   ├── Dockerfile   # Containerization
+│   ├── services/            # Microservices & Data Processing
+│   │   ├── summarizer/      # NLP Summarization (Python)
+│   │   │   ├── main.py
+│   │   │   ├── summarizer.py
+│   │   │   ├── requirements.txt
+│   │   │   ├── Dockerfile
+│   │   ├── transcription/   # OpenAI Whisper Speech-to-Text
+│   │   │   ├── main.py
+│   │   │   ├── whisper.py
+│   │   │   ├── requirements.txt
+│   │   │   ├── Dockerfile
+│   ├── kafka/               # Kafka Message Queue
+│   │   ├── kafka_config.py  # Kafka Configuration
+│   │   ├── producer.py      # Kafka Producer
+│   │   ├── consumer.py      # Kafka Consumer
+│   │   ├── Dockerfile       # Containerization
+│── frontend/                # Frontend (React + Next.js)
+│   ├── src/
+│   │   ├── components/      # UI Components
+│   │   │   ├── ChatUI.tsx
+│   │   │   ├── Message.tsx
+│   │   │   ├── AgentStatus.tsx
+│   │   ├── pages/           # App Pages
+│   │   │   ├── index.tsx
+│   │   │   ├── dashboard.tsx
+│   │   │   ├── auth.tsx
+│   │   ├── utils/           # Helper Functions
+│   │   │   ├── api.ts
+│   │   │   ├── auth.ts
+│   │   ├── styles/          # Styling (Tailwind)
+│   │   │   ├── globals.css
+│   ├── public/              # Static Assets
+│   │   ├── logo.svg
+│   ├── package.json         # Node.js Dependencies
+│   ├── next.config.js       # Next.js Config
+│   ├── Dockerfile           # Containerization
+│── database/                # Database & Supabase Setup
+│   ├── schema.sql           # Database Schema
+│   ├── migrations/          # Database Migrations
+│   ├── seed.sql             # Sample Data
+│   ├── docker-compose.yml   # Supabase + Postgres
+│── config/                  # Global Configurations
+│   ├── config.yaml          # Global Configuration File
+│   ├── env/                 # Environment Variables
+│   │   ├── .env.local
+│   │   ├── .env.production
+│   ├── secrets/             # Secrets Management (Doppler)
+│   │   ├── doppler.yaml
+│── infra/                   # Infrastructure & Deployment
+│   ├── k8s/                 # Kubernetes Deployment
+│   │   ├── orchestrator-deployment.yaml
+│   │   ├── agents-deployment.yaml
+│   │   ├── kafka-deployment.yaml
+│   ├── ci-cd/               # CI/CD Pipelines
+│   │   ├── github-actions.yaml
+│   │   ├── argo-workflows.yaml
+│   ├── monitoring/          # Observability Stack
+│   │   ├── prometheus-config.yaml
+│   │   ├── grafana-config.yaml
+│   │   ├── loki-config.yaml
+│── tests/                   # End-to-End & Integration Testing
+│   ├── e2e/                 # Cypress for Frontend Tests
+│   │   ├── chat.test.js
+│   │   ├── auth.test.js
+│   ├── integration/         # Backend API Tests
+│   │   ├── orchestrator.test.py
+│   │   ├── kafka.test.py
+│   │   ├── agents.test.py
+│── docs/                    # Documentation
+│   ├── architecture.md      # System Architecture
+│   ├── api.md               # API Documentation
+│   ├── deployment.md        # Deployment Guide
+│── .gitignore               # Ignore Unnecessary Files
+│── README.md                # Project Overview
+│── LICENSE                  # License Information

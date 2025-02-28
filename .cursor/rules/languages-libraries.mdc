@@ -1,0 +1,116 @@
+---
+description: Use this list of development languages, libraries, packages and dependencies to standardize development across the project 
+globs: `.py, .go, .rs, .tsx, .ts, .css, .json, .yaml,`  `.yml, .md, .sql, .toml, .js, .env,` `.dockerfile,`  `Dockerfile, .gitignore, .jsx` 
+alwaysApply: false
+---
+## **Programming Languages & Preferred Libraries** 
+
+1. **Python**
+	- Used for AI agent orchestration, LLM API integration, HITL workflows, and backend logic.
+	- Key Libraries:
+		- `pydantic` – Data validation and parsing.
+		- `langgraph` – Multi-agent orchestration and reasoning. use **LangGraph combined with HumanLayer**
+		- `HumanLayer` – Granular control over HITL interactions working alongside LangGraph
+		- `asyncio` – Asynchronous task management.
+		- `FastAPI` – High-performance API framework.
+		- `Kafka-python` – Integration with Apache Kafka for message queuing.
+		- `requests` – HTTP request handling.
+		- `OpenAI` – API wrapper for OpenAI models.
+		- `Anthropic` – API wrapper for Claude models.
+		- `whisper` – OpenAI’s speech-to-text transcription.
+		- `trulens` – Logging and evaluation for LLMs in production.
+		- `pytest` – Unit testing framework.
+		- `prometheus_client` – Metrics for observability.
+2. **Go**
+	- Used for high-performance scrapers, web crawlers, and API fetchers.
+	- Key Libraries:
+		- `colly` – Web scraping framework.
+		- `goquery` – HTML parsing.
+		- `gRPC` – High-performance remote procedure calls.
+		- `fiber` – Fast Go web framework.
+		- `kafka-go` – Kafka message streaming.
+		- `oauth2` – Secure authentication handling.
+3. **Rust**
+	- Used for backend services requiring high speed and memory safety.
+	- Key Libraries:
+		- `actix-web` – Web framework for APIs.
+		- `tokio` – Asynchronous runtime.
+		- `serde` – Data serialization.
+		- `reqwest` – HTTP client.
+		- `rskafka` – Kafka client for Rust.
+4. **JavaScript (React & Node.js)**
+	- React front-end UI using Shadcn UI.
+	- Node.js server-side integrations.
+	- Key Libraries:
+		- `react` – Front-end framework.
+		- `shadcn/ui` – UI component library.
+		- `next.js` – React framework for server-side rendering.
+		- `axios` – HTTP requests.
+		- `jest` – Testing framework.
+		- `socket.io` – Real-time communication.
+		- `tailwindcss` – Styling framework.
+		- `framer` – UI design and animation.
+		- `figma` – UI/UX design support.
+		- `express` – Lightweight API backend.
+
+
+----
+
+## **Core Infrastructure & DevOps**
+
+1. **Secrets Management**
+	- **Doppler** – API key and secret management, enabling runtime swapping of LLM providers.
+2. **Containerization & Orchestration**
+	- **Docker** – Containerized application environment.
+	- **Kubernetes (K8s)** – Cluster management and service orchestration.
+3. **Asynchronous Workflows & Job Queueing**
+	- **Apache Kafka** – Event streaming and job queueing.
+	- **Kafka Streams** – Real-time processing of streaming data.
+4. **Database & Storage**
+	- **Supabase** – Backend database with PostgreSQL.
+	- **Redis** – In-memory caching.
+	- **Blob storage (AWS S3, GCS, or MinIO)** – Storing large AI-related artifacts.
+5. **Continuous Integration & Deployment (CI/CD)**
+	- **GitHub Actions** – Automated testing and deployment.
+	- **ArgoCD** – Kubernetes GitOps deployment.
+
+
+----
+
+## **Authentication & Security**
+
+1. **OAuth2 & Access Management**
+	- **OAuth2** – Secure user authentication.
+	- **JWT (JSON Web Tokens)** – Secure API authentication.
+	- **Role-Based Access Control (RBAC)** – Restrict system actions based on roles.
+2. **API Security**
+	- **Rate Limiting** – To prevent API abuse.
+	- **OWASP Security Best Practices** – API security hardening.
+
+
+----
+
+## **Observability & Monitoring**
+
+1. **Metrics & Logging**
+	- **Prometheus** – Performance monitoring.
+	- **Grafana** – Visualization and alerting.
+	- **Fluentd or ELK Stack** – Centralized logging.
+2. **Distributed Tracing**
+	- **OpenTelemetry** – Tracing API request flow across services.
+
+
+----
+
+## **LLM Model Integrations & AI-Specific Dependencies**
+
+1. **LLM APIs & Models**
+	- **Anthropic Claude 3.7 Sonnet** – Code generation & general NLP.
+	- **OpenAI GPT-4 & GPT-3.5** – General text processing.
+	- **OpenAI Whisper** – Speech-to-text transcription.
+	- **HuggingFace Transformers** – Fine-tuned open-source models.
+	- **Llama 2 / Code Llama** – Alternative code models.
+2. **Human-in-the-Loop (HITL)**
+	- **LangGraph** – HITL decision-making workflows.
+	- **HumanLayer** – AI-human escalation via Front end of app.
+	- **Amazon Augmented AI (A2I)** – Managed human review workflows.

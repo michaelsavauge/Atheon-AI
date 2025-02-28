@@ -1,0 +1,6 @@
+---
+description: Summary of goals and functionality of the application
+globs: 
+alwaysApply: false
+---
+**Atheon AI** is a scalable, multi-agent orchestration system designed to autonomously handle complex workflows while allowing customizable human oversight (HITL). It consists of vertical agents, acting as high-level project managers that interact with users and delegate tasks, and horizontal agents, specialized in executing specific actions like managing emails, summarizing documents, or integrating with APIs. The system prioritizes parallel execution, deep task delegation, and flexible LLM routing, ensuring each task is handled by the most capable AI model (e.g., Claude for coding, Whisper for transcription). Built for high scalability, horizontal agents can be dynamically duplicated for different accounts or workloads, and vertical agents ensure smooth coordination. The app seamlessly integrates Python-based AI agents with tools written in Go, Rust, React, Next.js, and JavaScript, leveraging LangGraph for structured workflow execution and HumanLayer for precise human approvals where needed. The ultimate goal is to create an intelligent, autonomous agent ecosystem that balances efficiency and automation with strategic human intervention, making AI-driven task execution both powerful and controllable.

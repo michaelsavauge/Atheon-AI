@@ -1,0 +1,150 @@
+---
+description: When writing the code for each file, make sure the syntax follows the naming conventions, standards and corresponding dependency, package management and performance standards
+globs: `.py, .go, .rs, .tsx, .ts, .css, .json, .yaml,`  `.yml, .md, .sql, .toml, .js, .env,` `.dockerfile,`  `Dockerfile, .gitignore, .jsx` 
+alwaysApply: false
+---
+### **Project-Specific Rules** 
+
+
+## 🔹 **General Project Conventions**
+
+1. **Strict Type Enforcement:**
+	- All Python functions must use **type hints**.
+	- All Go and Rust code should have **explicit type annotations**.
+	- TypeScript should be enforced for all frontend code (`.tsx` files).
+2. **Separation of Concerns:**
+	- The **orchestrator (Vertical Agent)** should only **delegate** tasks, not perform them.
+	- **Horizontal agents** should execute **only their specific tasks** (e.g., summarization, scraping, transcription).
+	- **Frontend and backend should not share business logic**—only communicate via APIs.
+3. **Standardized File Naming:**
+	- Use **snake_case** for Python (`task_manager.py`).
+	- Use **PascalCase** for TypeScript components (`ChatUI.tsx`).
+	- Use **kebab-case** for configuration files (`config.yaml`).
+	- Use **camelCase** for JavaScript functions (`handleClick`).
+4. **Clear Module Imports & Exports:**
+	- Always use **absolute imports** (not relative imports) in Python and TypeScript.
+	- Go modules should use fully qualified paths (`github.com/project/agents`).
+	- Avoid wildcard imports (`import *` is not allowed in Python).
+5. **Consistent Logging & Debugging:**
+	- Use **structured logging** (`loguru` for Python, `log` package for Go, `tracing` for Rust).
+	- Logs should **always include timestamps** and **request IDs**.
+	- Use **debug-level logs for dev** and **error-level logs for production**.
+
+
+----
+
+## 🟦 **Backend (Python, Go, Rust)**
+
+
+### **Python (Orchestrator & AI Agents)**
+
+1. **Project Structure Conventions:**
+	- All AI agent logic should be inside `/backend/agents/`.
+	- The orchestrator (`/backend/orchestrator/`) should only **route** tasks and manage **HITL validation**.
+	- Kafka producers/consumers must be placed in `/backend/kafka/`.
+2. **Function Naming Conventions:**
+	- API routes should use `snake_case`.
+	- LLM-related methods should be prefixed with `llm_` (`llm_generate_summary`).
+	- Kafka functions should be prefixed with `kafka_` (`kafka_produce_event`).
+3. **Asynchronous Standards:**
+	- All AI agent functions should be **async**.
+	- Kafka consumers should use **async event loops** for non-blocking execution.
+	- Do not use `time.sleep()` in async code; use `asyncio.sleep()`.
+4. **Dependency & Package Management:**
+	- Always use `poetry` for managing dependencies.
+	- `requirements.txt` should be auto-generated via `poetry export`.
+
+### **Go (Web Scrapers & Crawlers)**
+
+1. **Concurrency & Performance Standards:**
+	- Use **goroutines** for API calls and web scraping.
+	- Always use `sync.WaitGroup` for managing goroutines.
+	- Avoid `fmt.Println()` for logging—use `logrus` instead.
+2. **Kafka Integration Rules:**
+	- Kafka messages should be **JSON-encoded**.
+	- Use `Sarama` as the Kafka client library.
+
+### **Rust (Data Fetching & API Services)**
+
+1. **Memory-Safe Practices:**
+	- Use **Arc and Mutex** when sharing data between threads.
+	- Prefer **async functions** with `tokio` over blocking threads.
+	- Avoid `unwrap()`; always use error handling with `?` operator.
+2. **API Communication Rules:**
+	- Use `reqwest` for HTTP requests.
+	- Use `serde_json` for all data serialization.
+
+
+----
+
+## 🟨 **Frontend (React + Next.js)**
+
+1. **Component Organization:**
+	- Reusable UI components should go into `/frontend/src/components/`.
+	- Pages should be under `/frontend/src/pages/`.
+	- API functions should be in `/frontend/src/utils/api.ts`.
+2. **Styling & UI Rules:**
+	- **Tailwind CSS** is the primary styling framework.
+	- All **shadcn/ui** components should be used **without manual overrides** unless necessary.
+3. **State Management Standards:**
+	- **React Query** should be used for API fetching & caching.
+	- **useState** should only be used for local component state.
+	- **useContext** should be used for global app-wide state.
+4. **Routing & Navigation:**
+	- **Next.js dynamic routing** should be used for dashboard pages (`/dashboard/[id]`).
+	- All API calls should be handled via Next.js API routes (`/api/`).
+5. **Testing Rules:**
+	- Unit tests should use **Jest & React Testing Library**.
+	- Cypress should be used for **end-to-end (E2E) testing**.
+
+
+----
+
+## 🟩 **DevOps & Infrastructure**
+
+1. **Containerization & Deployment Rules:**
+	- **Each backend service (orchestrator, agents, Kafka, DB) should have its own Dockerfile**.
+	- **Docker Compose** should be used for local development.
+	- Use **ArgoCD** for managing Kubernetes deployments.
+2. **Secrets Management:**
+	- **Doppler** should be used to manage all API keys.
+	- API keys should **never** be hardcoded in config files.
+3. **CI/CD Rules (GitHub Actions + ArgoCD):**
+	- **Code must pass all tests** before deployment.
+	- Linting must be run before commits (`pre-commit hooks`).
+	- Docker images should be auto-built and pushed to a container registry (`ghcr.io`).
+
+
+----
+
+## 🟥 **AI Model Selection & LLM Routing**
+
+1. **Model Selection Criteria:**
+	- Claude 3.7 Sonnet → **Code Generation & Reasoning**.
+	- OpenAI Whisper → **Speech-to-Text Transcription**.
+	- GPT-4 → **Summarization, General NLP tasks**.
+	- Llama 2 / HuggingFace → **Cost-efficient open-source fallback**.
+2. **Model Routing & Flexibility:**
+	- API calls to models **must be dynamically routed** based on task.
+	- **Doppler should store LLM API keys** for flexible switching.
+3. **Prompt Engineering Rules:**
+	- Prompts should be **stored in a separate file** (`/backend/prompts/`).
+	- Use **Pydantic models** for structured LLM responses.
+
+
+----
+
+## 🔷 **Testing & Quality Assurance**
+
+1. **Unit Tests & Integration Tests:**
+	- Python: **pytest**
+	- Go: **Go’s built-in testing package**
+	- Rust: **cargo test**
+	- Frontend: **Jest & Cypress**
+2. **Code Coverage Requirements:**
+	- Backend code must have **80% test coverage**.
+	- Critical AI logic must have **100% test coverage**.
+3. **Pull Request & Code Review Rules:**
+	- All PRs require at least **1 approving review** before merging.
+	- PR descriptions must include **a summary of changes**.
+	- Large PRs should be **split into smaller atomic commits**.

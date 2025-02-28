@@ -1,0 +1,191 @@
+---
+description: Follow these 10 phases of development step by step in order when building this project 
+globs: `.py, .go, .rs, .tsx, .ts, .css, .json, .yaml,`  `.yml, .md, .sql, .toml, .js, .env,` `.dockerfile,`  `Dockerfile, .gitignore, .jsx` 
+alwaysApply: false
+---
+# AI Agent Orchestration System: Build Roadmap
+
+## Phase 1: Project Setup & Foundation
+
+1. **Environment Configuration**
+   - Set up development environments for Python, Go, and Rust
+   - Configure Doppler for secrets management
+   - Set up Git repository with proper branching strategy
+   - Implement pre-commit hooks for linting and testing
+
+2. **Base Infrastructure**
+   - Create Docker configuration for local development
+   - Set up Kubernetes configuration files for orchestration
+   - Configure CI/CD with GitHub Actions
+   - Implement ArgoCD for GitOps deployment
+
+3. **Core Backend Scaffolding**
+   - Create the orchestrator service structure (Python)
+   - Set up base Kafka configuration for message queuing
+   - Implement basic horizontal agent structures (Python, Go, Rust)
+   - Create initial database schema in Supabase
+
+## Phase 2: Orchestrator Development
+
+4. **Vertical Agent Implementation**
+   - Develop the main orchestrator service 
+   - Implement LangGraph for multi-agent orchestration
+   - Create task breakdown and routing logic
+   - Build API endpoints with FastAPI
+
+5. **LLM Integration & Dynamic Model Selection**
+   - Set up API wrappers for Claude, OpenAI, and other models
+   - Implement dynamic model routing based on task types
+   - Create prompt engineering templates
+   - Configure Doppler for API key management and swapping
+
+6. **Human-in-the-Loop Framework**
+   - Integrate HumanLayer for HITL workflows
+   - Build approval request system with notifications
+   - Implement asynchronous human feedback processing
+   - Create HITL decision storage and tracking
+
+## Phase 3: Specialized Horizontal Agents
+
+7. **Web Scraper Agent (Go)**
+   - Implement web scraping with Colly framework
+   - Create HTML parsing with goquery
+   - Set up concurrent scraping with goroutines
+   - Build Kafka integration for job queue management
+
+8. **Data Fetcher Agent (Rust)**
+   - Develop API fetching logic with reqwest
+   - Implement asynchronous processing with tokio
+   - Create data serialization with serde
+   - Build Kafka integration for job handling
+
+9. **AI Service Agents (Python)**
+   - Develop summarization service with NLP models
+   - Implement speech-to-text with OpenAI Whisper
+   - Create code generation agent with Claude
+   - Build general text processing agent with GPT-4
+
+## Phase 4: Frontend Development
+
+10. **Core UI Framework**
+    - Set up Next.js project structure
+    - Configure Tailwind CSS and Shadcn UI
+    - Implement responsive layout and theme
+    - Create authentication flow
+
+11. **Agent Interaction UI**
+    - Build ChatUI component
+    - Implement real-time message handling
+    - Create agent status indicators
+    - Develop HITL approval interfaces
+
+12. **Dashboard & Monitoring UI**
+    - Create dashboard layout and navigation
+    - Implement task visualization and tracking
+    - Build agent performance metrics display
+    - Create administrative controls
+
+## Phase 5: Integration & Communication
+
+13. **Kafka Message Queue Setup**
+    - Configure Kafka topics for different agent communications
+    - Implement producers and consumers
+    - Set up message serialization/deserialization
+    - Implement error handling and retries
+
+14. **API Gateway & Service Communication**
+    - Create central API gateway
+    - Implement authentication and authorization
+    - Set up rate limiting and security measures
+    - Build service discovery mechanisms
+
+15. **Event-Driven Architecture**
+    - Implement event streaming for real-time updates
+    - Create asynchronous workflow processing
+    - Build task state management
+    - Implement webhook integrations
+
+## Phase 6: Security & Compliance
+
+16. **Authentication & Authorization**
+    - Implement OAuth2 and JWT for security
+    - Create RBAC (Role-Based Access Control)
+    - Set up secure API authentication
+    - Configure MFA for administrative access
+
+17. **End-to-End Encryption**
+    - Lets address this process at the end, we will wrap the whole project in an encryption layer at the end so that way the encryption doesnt impede performance or compatability issues. 
+
+18. **Logging & Monitoring**
+    - Set up centralized logging with ELK stack
+    - Implement Prometheus and Grafana for metrics
+    - Create alerts and notifications
+    - Build audit logging for compliance
+
+## Phase 7: Scaling & Performance Optimization
+
+19. **Kubernetes Configuration for Scale**
+    - Implement Horizontal Pod Autoscaling
+    - Configure resource requests and limits
+    - Set up KEDA for event-driven scaling
+    - Implement liveness and readiness probes
+
+20. **Kafka Performance Tuning**
+    - Configure optimal partitioning
+    - Implement compression for large messages
+    - Set up consumer lag monitoring
+    - Optimize producer and consumer configurations
+
+21. **Load Balancing & Concurrency**
+    - Implement load balancing strategies
+    - Configure back-pressure mechanisms
+    - Optimize concurrency settings
+    - Create request throttling when needed
+
+## Phase 8: Testing & Quality Assurance
+
+22. **Unit Testing**
+    - Write tests for Python code with pytest
+    - Implement Go tests with the standard testing package
+    - Create Rust tests with cargo test
+    - Write frontend tests with Jest
+
+23. **Integration Testing**
+    - Build API integration tests
+    - Create end-to-end testing with Cypress
+    - Implement Kafka testing
+    - Build LLM response validation
+
+24. **Performance & Load Testing**
+    - Create benchmarks for critical paths
+    - Implement load testing scenarios
+    - Build scalability tests
+    - Create response time monitoring
+
+## Phase 9: Documentation & Deployment
+
+25. **System Documentation**
+    - Create architecture documentation
+    - Write API documentation
+    - Build deployment guides
+    - Create troubleshooting documentation
+
+26. **Production Deployment**
+    - Set up staging environment
+    - Implement blue-green deployment
+    - Configure monitoring and alerts
+    - Create backup and recovery procedures
+
+## Phase 10: Maintenance & Iteration
+
+27. **Monitoring & Optimization**
+    - Analyze performance metrics
+    - Identify and resolve bottlenecks
+    - Implement continuous improvement
+    - Monitor and optimize costs
+
+28. **Feature Extensions**
+    - Add support for additional AI models
+    - Implement new agent types
+    - Create advanced analytics
+    - Develop additional integrations
