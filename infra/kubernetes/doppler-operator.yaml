@@ -1,0 +1,20 @@
+apiVersion: secrets.doppler.com/v1alpha1
+kind: DopplerSecret
+metadata:
+  name: doppler-env-vars
+spec:
+  managedSecret:
+    name: doppler-env-vars
+    namespace: atheon
+  tokenSecret:
+    name: doppler-token-secret
+    namespace: atheon
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: doppler-token-secret
+  namespace: atheon
+type: Opaque
+stringData:
+  serviceToken: "${DOPPLER_SERVICE_TOKEN}"

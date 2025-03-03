@@ -10,12 +10,16 @@ services:
     volumes:
       - ./backend/orchestrator:/app
     environment:
-      - DATABASE_URL=postgresql://atheon_user:atheon_password@postgres:5432/atheon
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - JWT_SECRET=local_development_secret
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - LOG_LEVEL=DEBUG
+      # Examples of environment variables that will be loaded via Doppler
+      - DATABASE_URL
+      - KAFKA_BOOTSTRAP_SERVERS
+      - JWT_SECRET
+      - OPENAI_API_KEY
+      - ANTHROPIC_API_KEY
+      - HUGGINGFACE_API_KEY
+      - LOG_LEVEL
+    env_file:
+      - .env # This will be populated by Doppler when running with doppler run
     depends_on:
       - postgres
       - kafka
@@ -31,8 +35,11 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NODE_ENV=development
+      # Examples of environment variables that will be loaded via Doppler
+      - NEXT_PUBLIC_API_URL
+      - NODE_ENV
+    env_file:
+      - .env # This will be populated by Doppler when running with doppler run
     depends_on:
       - orchestrator
     restart: unless-stopped
@@ -42,9 +49,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=atheon_user
-      - POSTGRES_PASSWORD=atheon_password
-      - POSTGRES_DB=atheon
+      - POSTGRES_USER=${POSTGRES_USER:-atheon_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-atheon_password}
+      - POSTGRES_DB=${POSTGRES_DB:-atheon}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql

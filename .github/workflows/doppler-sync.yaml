@@ -1,0 +1,39 @@
+name: Doppler Config Sync
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  sync-configs:
+    name: Sync Doppler Configs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Doppler CLI
+        run: |
+          (curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh || wget -t 3 -qO- https://cli.doppler.com/install.sh) | sudo sh
+
+      - name: Setup Doppler
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          doppler login --token $DOPPLER_TOKEN
+
+      - name: Create backup of dev config
+        run: |
+          doppler setup --project atheon-ai --config dev
+          doppler secrets download --format env --no-file > config/env/dev-backup-$(date +%Y%m%d).env
+
+      - name: Create backup of prod config
+        run: |
+          doppler setup --project atheon-ai --config prod
+          doppler secrets download --format env --no-file > config/env/prod-backup-$(date +%Y%m%d).env
+
+      - name: Commit backups
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "Automated Doppler config backup"
+          file_pattern: config/env/dev-backup-*.env config/env/prod-backup-*.env

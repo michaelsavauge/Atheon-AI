@@ -35,6 +35,7 @@ atheon-ai/
 - Node.js 18+
 - Python 3.10+
 - Poetry (Python package manager)
+- Doppler CLI (for secrets management)
 
 ### Local Development
 
@@ -45,18 +46,27 @@ git clone https://github.com/atheon-ai/atheon-ai.git
 cd atheon-ai
 ```
 
-2. Set up environment variables:
+2. Set up Doppler for secrets management:
 
 ```bash
-# Create a .env file with your API keys
-cp .env.example .env
-# Edit the .env file with your API keys
+# Install Doppler CLI (macOS)
+brew install dopplerhq/cli/doppler
+
+# Login to Doppler
+doppler login
+
+# Set up project configuration
+doppler setup --project atheon-ai --config dev
 ```
 
-3. Start the development environment:
+3. Start the development environment with Doppler:
 
 ```bash
-docker-compose up -d
+# Using the helper script
+./scripts/doppler-run.sh docker-compose up -d
+
+# Or directly with Doppler
+doppler run -- docker-compose up -d
 ```
 
 4. Access the services:
