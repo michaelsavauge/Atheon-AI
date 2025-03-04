@@ -33,26 +33,6 @@ services:
       start_period: 40s
     restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      # Examples of environment variables that will be loaded via Doppler
-      - NEXT_PUBLIC_API_URL
-      - NODE_ENV
-    env_file:
-      - .env # This will be populated by Doppler when running with doppler run
-    depends_on:
-      orchestrator:
-        condition: service_healthy
-    restart: unless-stopped
-
   postgres:
     image: postgres:15
     ports:

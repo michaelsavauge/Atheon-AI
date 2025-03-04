@@ -6,6 +6,7 @@ middleware, and event handlers.
 """
 
 import asyncio
+import os
 from typing import Dict
 
 from fastapi import FastAPI, HTTPException
@@ -31,6 +32,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Create logs directory if it doesn't exist
+os.makedirs("logs", exist_ok=True)
 
 # Configure logging
 logger.remove()
@@ -59,16 +63,24 @@ async def shutdown_event() -> None:
     # Close Kafka connections
 
 
-@app.get("/")
-async def root() -> Dict[str, str]:
-    """Root endpoint for health check."""
-    return {"status": "ok", "service": "Atheon AI Orchestrator"}
-
-
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
-    """Health check endpoint."""
-    return {"status": "healthy"}
+    """Health check endpoint for the orchestrator service.
+
+    Returns:
+        Dict[str, str]: Health status of the service.
+    """
+    return {"status": "healthy", "service": "orchestrator"}
+
+
+@app.get("/")
+async def root() -> Dict[str, str]:
+    """Root endpoint for the orchestrator service.
+
+    Returns:
+        Dict[str, str]: Welcome message.
+    """
+    return {"message": "Welcome to Atheon AI Orchestrator"}
 
 
 # Import and include routers

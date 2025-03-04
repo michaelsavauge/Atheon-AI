@@ -1,36 +1,54 @@
--- Atheon AI Database Schema
+-- Basic schema for Atheon AI
+-- This is a simplified version for initial deployment
 
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) NOT NULL UNIQUE,
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     role VARCHAR(50) NOT NULL DEFAULT 'user',
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    last_login TIMESTAMP WITH TIME ZONE
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tasks Table
 CREATE TABLE IF NOT EXISTS tasks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    task_id VARCHAR(50) NOT NULL UNIQUE,
+    id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    task_type VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    completed_at TIMESTAMP WITH TIME ZONE,
-    priority INTEGER NOT NULL DEFAULT 1,
-    require_hitl BOOLEAN NOT NULL DEFAULT TRUE,
+    priority VARCHAR(50) NOT NULL DEFAULT 'medium',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by INTEGER REFERENCES users(id),
+    requires_approval BOOLEAN DEFAULT FALSE,
+    task_type VARCHAR(50) NOT NULL,
     parameters JSONB,
     result JSONB,
-    error TEXT,
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL
+    error_message TEXT
 );
+
+-- Create an updated_at trigger function
+CREATE OR REPLACE FUNCTION trigger_set_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create triggers for updated_at
+CREATE TRIGGER set_timestamp_users
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_timestamp();
+
+CREATE TRIGGER set_timestamp_tasks
+BEFORE UPDATE ON tasks
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_timestamp();
 
 -- Agents Table
 CREATE TABLE IF NOT EXISTS agents (
@@ -126,24 +144,3 @@ CREATE INDEX IF NOT EXISTS idx_hitl_approvals_status ON hitl_approvals(status);
 CREATE INDEX IF NOT EXISTS idx_llm_requests_task_id ON llm_requests(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_messages_task_id ON task_messages(task_id);
 CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
-
--- Functions and Triggers
-CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_users_updated_at
-BEFORE UPDATE ON users
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER trigger_tasks_updated_at
-BEFORE UPDATE ON tasks
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER trigger_agents_updated_at
-BEFORE UPDATE ON agents
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
