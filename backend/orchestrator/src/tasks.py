@@ -1,443 +1,470 @@
+#!/usr/bin/env python3
 """
-Task management module for the Atheon AI Orchestrator.
+Task Management Module
 
-This module provides functions for task creation, routing, and execution
-using LangGraph for orchestration.
+This module defines the core data models and logic for task management
+in the Atheon AI system, including task definition, decomposition,
+priority handling, and status tracking.
 """
 
-import asyncio
+import enum
 import json
+import uuid
 from datetime import datetime
-from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from langgraph.graph import END, StateGraph
+from pydantic import BaseModel, Field, validator, field_validator
 from loguru import logger
-from pydantic import BaseModel, Field
 
-from src.ai_agent import llm_generate_text
-from src.config import settings
-from src.hitl import hitl_manager
-from src.utils import format_timestamp, generate_task_id
+class TaskType(str, enum.Enum):
+    """Types of tasks supported by the system."""
+    SUMMARIZATION = "summarization"
+    WEB_SCRAPING = "web_scraping"
+    API_FETCH = "api_fetch"
+    TRANSCRIPTION = "transcription"
+    CUSTOM = "custom"
 
-
-class TaskStatus(str, Enum):
-    """Enum for task status."""
-
+class TaskStatus(str, enum.Enum):
+    """Possible states of a task."""
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
+    REQUIRES_APPROVAL = "requires_approval"
+    APPROVED = "approved"
+    REJECTED = "rejected"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    WAITING_APPROVAL = "waiting_approval"
-    APPROVED = "approved"
-    REJECTED = "rejected"
 
+class TaskPriority(str, enum.Enum):
+    """Task priority levels."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
 
-class TaskType(str, Enum):
-    """Enum for task types."""
+class TaskCreate(BaseModel):
+    """Model for creating a new task."""
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str = Field(..., min_length=1, max_length=1000)
+    task_type: TaskType
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    requires_approval: bool = Field(default=False)
+    priority: TaskPriority = Field(default=TaskPriority.MEDIUM)
 
-    SUMMARIZATION = "summarization"
-    WEB_SCRAPING = "web_scraping"
-    TRANSCRIPTION = "transcription"
-    CODE_GENERATION = "code_generation"
-    DATA_ANALYSIS = "data_analysis"
-    GENERAL = "general"
+    @field_validator("parameters")
+    @classmethod
+    def validate_parameters(cls, v: Dict[str, Any], info: Any) -> Dict[str, Any]:
+        """Validate that the parameters match the expected format for the task type."""
+        task_type = info.data.get("task_type")
 
+        if task_type == TaskType.SUMMARIZATION:
+            # Check for required parameters for summarization tasks
+            required_params = ["text"]
+            for param in required_params:
+                if param not in v:
+                    raise ValueError(f"Missing required parameter '{param}' for {task_type} task")
 
-class Task(BaseModel):
-    """Model for task information."""
+        elif task_type == TaskType.WEB_SCRAPING:
+            # Check for required parameters for web scraping tasks
+            required_params = ["url"]
+            for param in required_params:
+                if param not in v:
+                    raise ValueError(f"Missing required parameter '{param}' for {task_type} task")
 
-    task_id: str = Field(..., description="Unique task identifier")
-    title: str = Field(..., description="Task title")
-    description: str = Field(..., description="Task description")
-    task_type: TaskType = Field(..., description="Type of task")
-    status: TaskStatus = Field(
-        default=TaskStatus.PENDING, description="Current task status"
-    )
-    created_at: str = Field(..., description="Creation timestamp")
-    updated_at: str = Field(..., description="Last update timestamp")
-    completed_at: Optional[str] = Field(
-        default=None, description="Completion timestamp"
-    )
-    priority: int = Field(default=1, description="Task priority (1-5)")
-    require_hitl: bool = Field(
-        default=True, description="Whether human approval is required"
-    )
-    parameters: Dict[str, Any] = Field(
-        default_factory=dict, description="Task-specific parameters"
-    )
-    result: Optional[Dict[str, Any]] = Field(
-        default=None, description="Task result"
-    )
-    error: Optional[str] = Field(default=None, description="Error message if failed")
+        elif task_type == TaskType.API_FETCH:
+            # Check for required parameters for API fetch tasks
+            required_params = ["endpoint"]
+            for param in required_params:
+                if param not in v:
+                    raise ValueError(f"Missing required parameter '{param}' for {task_type} task")
 
+        elif task_type == TaskType.TRANSCRIPTION:
+            # Check for required parameters for transcription tasks
+            required_params = ["audio_url"]
+            for param in required_params:
+                if param not in v:
+                    raise ValueError(f"Missing required parameter '{param}' for {task_type} task")
 
-class TaskManager:
-    """Manager for task orchestration."""
+        return v
 
-    def __init__(self) -> None:
-        """Initialize the task manager."""
-        self._tasks: Dict[str, Task] = {}
-        self._setup_workflow_graph()
+class TaskResponse(BaseModel):
+    """Model for task information in responses."""
+    id: str
+    title: str
+    description: str
+    task_type: TaskType
+    status: TaskStatus
+    created_by: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    requires_approval: bool = False
+    priority: TaskPriority = TaskPriority.MEDIUM
+    parameters: Optional[Dict[str, Any]] = None
+    result: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
 
-    def _setup_workflow_graph(self) -> None:
-        """Set up the LangGraph workflow graph."""
-        # Define the state schema
-        class GraphState(BaseModel):
-            """State for the workflow graph."""
+    class Config:
+        """Pydantic configuration."""
+        from_attributes = True
 
-            task: Task
-            context: Dict[str, Any] = Field(default_factory=dict)
-            messages: List[Dict[str, str]] = Field(default_factory=list)
+class SubTask(BaseModel):
+    """Model for a sub-task created through task decomposition."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    parent_task_id: str
+    title: str
+    description: str
+    task_type: TaskType
+    status: TaskStatus = Field(default=TaskStatus.PENDING)
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    result: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    order: int = 0  # For sequential execution ordering
 
-        # Define the nodes in the graph
-        def analyze_task(state: GraphState) -> GraphState:
-            """Analyze the task and determine next steps."""
-            task = state.task
-            logger.info(f"Analyzing task {task.task_id}")
+class TaskDecomposition:
+    """
+    Service for decomposing complex tasks into smaller subtasks.
+    """
 
-            # Update task status
-            task.status = TaskStatus.IN_PROGRESS
-            task.updated_at = format_timestamp()
+    @staticmethod
+    async def decompose_task(task: TaskResponse) -> List[SubTask]:
+        """
+        Decompose a complex task into smaller subtasks.
 
-            # Add analysis to context
-            state.context["analysis"] = {
-                "task_type": task.task_type,
-                "complexity": "medium",  # This would be determined by LLM
-                "estimated_time": "5 minutes",  # This would be determined by LLM
-            }
+        Args:
+            task: The task to decompose.
 
-            # Add a message
-            state.messages.append({
-                "role": "system",
-                "content": f"Task {task.task_id} analysis completed."
-            })
+        Returns:
+            List[SubTask]: The list of subtasks.
+        """
+        logger.info(f"Decomposing task {task.id}")
 
-            return state
+        # This is a simplistic implementation
+        # In a real system, this would likely use an LLM to analyze the task
+        # and determine the appropriate decomposition strategy
 
-        def route_task(state: GraphState) -> str:
-            """Route the task to the appropriate agent."""
-            task = state.task
-            logger.info(f"Routing task {task.task_id}")
+        subtasks = []
 
-            # Determine the next step based on task type
-            if task.require_hitl:
-                return "request_approval"
-            else:
-                return "execute_task"
+        # Example decomposition strategies based on task type
+        if task.task_type == TaskType.SUMMARIZATION and task.parameters:
+            # If the text is very long, split it into chunks
+            text = task.parameters.get("text", "")
+            if len(text) > 10000:  # Arbitrary threshold
+                chunk_size = 5000
+                chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
-        async def execute_task(state: GraphState) -> GraphState:
-            """Execute the task using the appropriate agent."""
-            task = state.task
-            logger.info(f"Executing task {task.task_id}")
+                # Create a subtask for each chunk
+                for i, chunk in enumerate(chunks):
+                    subtasks.append(
+                        SubTask(
+                            parent_task_id=task.id,
+                            title=f"{task.title} - Part {i+1}",
+                            description=f"Summarize part {i+1} of {len(chunks)}",
+                            task_type=TaskType.SUMMARIZATION,
+                            parameters={"text": chunk},
+                            order=i,
+                        )
+                    )
 
-            # This would call the appropriate horizontal agent via Kafka
-            # For now, we'll simulate execution with a delay
-            await asyncio.sleep(2)
+                # Add a final subtask to combine the summaries
+                subtasks.append(
+                    SubTask(
+                        parent_task_id=task.id,
+                        title=f"{task.title} - Final Compilation",
+                        description="Combine the summaries of all parts",
+                        task_type=TaskType.SUMMARIZATION,
+                        parameters={"operation": "combine"},
+                        order=len(chunks),
+                    )
+                )
 
-            # Update task with result
-            task.status = TaskStatus.COMPLETED
-            task.updated_at = format_timestamp()
-            task.completed_at = format_timestamp()
-            task.result = {
-                "output": f"Simulated result for task {task.task_id}",
-                "confidence": 0.95,
-            }
+        elif task.task_type == TaskType.WEB_SCRAPING and task.parameters:
+            # For web scraping, create subtasks for different aspects
+            url = task.parameters.get("url", "")
 
-            # Add a message
-            state.messages.append({
-                "role": "system",
-                "content": f"Task {task.task_id} execution completed."
-            })
-
-            return state
-
-        async def request_approval(state: GraphState) -> GraphState:
-            """Request human approval for the task."""
-            task = state.task
-            logger.info(f"Requesting approval for task {task.task_id}")
-
-            # Update task status
-            task.status = TaskStatus.WAITING_APPROVAL
-            task.updated_at = format_timestamp()
-
-            # Create an approval request
-            approval_request = await hitl_manager.create_approval_request(
-                task_id=task.task_id,
-                title=f"Approval for {task.title}",
-                description=f"Please review and approve the task: {task.description}",
-                data={
-                    "task_type": task.task_type,
-                    "parameters": task.parameters,
-                    "analysis": state.context.get("analysis", {}),
-                },
+            # Subtask for metadata extraction
+            subtasks.append(
+                SubTask(
+                    parent_task_id=task.id,
+                    title=f"Extract metadata from {url}",
+                    description="Extract title, meta tags, and other metadata",
+                    task_type=TaskType.WEB_SCRAPING,
+                    parameters={"url": url, "extract": "metadata"},
+                    order=0,
+                )
             )
 
-            # Store the request ID in context
-            state.context["approval_request_id"] = approval_request.request_id
+            # Subtask for content extraction
+            subtasks.append(
+                SubTask(
+                    parent_task_id=task.id,
+                    title=f"Extract main content from {url}",
+                    description="Extract the main content of the page",
+                    task_type=TaskType.WEB_SCRAPING,
+                    parameters={"url": url, "extract": "content"},
+                    order=1,
+                )
+            )
 
-            # Add a message
-            state.messages.append({
-                "role": "system",
-                "content": f"Approval requested for task {task.task_id}."
-            })
+            # Subtask for link extraction
+            subtasks.append(
+                SubTask(
+                    parent_task_id=task.id,
+                    title=f"Extract links from {url}",
+                    description="Extract all links from the page",
+                    task_type=TaskType.WEB_SCRAPING,
+                    parameters={"url": url, "extract": "links"},
+                    order=2,
+                )
+            )
 
-            return state
+        # If no specific decomposition strategy is implemented, return an empty list
+        logger.info(f"Task {task.id} decomposed into {len(subtasks)} subtasks")
+        return subtasks
 
-        async def check_approval(state: GraphState) -> str:
-            """Check if the task has been approved."""
-            task = state.task
-            request_id = state.context.get("approval_request_id")
+class TaskPriorityQueue:
+    """
+    Service for handling task priorities and scheduling.
+    """
 
-            if not request_id:
-                logger.error(f"No approval request ID found for task {task.task_id}")
-                return "handle_error"
+    def __init__(self):
+        """Initialize the task priority queue."""
+        self.tasks: Dict[str, Dict[str, Any]] = {}
 
-            # Get the approval request
-            approval_request = await hitl_manager.get_approval_request(request_id)
-
-            if not approval_request:
-                logger.error(f"Approval request {request_id} not found")
-                return "handle_error"
-
-            # Check the status
-            if approval_request.status == "approved":
-                logger.info(f"Task {task.task_id} approved")
-                task.status = TaskStatus.APPROVED
-                task.updated_at = format_timestamp()
-                return "execute_task"
-            elif approval_request.status == "rejected":
-                logger.info(f"Task {task.task_id} rejected")
-                task.status = TaskStatus.REJECTED
-                task.updated_at = format_timestamp()
-                task.error = approval_request.feedback or "Task rejected by user"
-                return "handle_rejection"
-            elif approval_request.status == "timeout":
-                logger.warning(f"Approval for task {task.task_id} timed out")
-                task.status = TaskStatus.FAILED
-                task.updated_at = format_timestamp()
-                task.error = "Approval request timed out"
-                return "handle_error"
-            else:
-                # Still pending, wait and check again
-                logger.info(f"Approval for task {task.task_id} still pending")
-                return "wait_for_approval"
-
-        async def wait_for_approval(state: GraphState) -> GraphState:
-            """Wait for approval and check again."""
-            # Wait for a short time before checking again
-            await asyncio.sleep(5)
-            return state
-
-        async def handle_rejection(state: GraphState) -> GraphState:
-            """Handle task rejection."""
-            task = state.task
-            logger.info(f"Handling rejection for task {task.task_id}")
-
-            # Add a message
-            state.messages.append({
-                "role": "system",
-                "content": f"Task {task.task_id} was rejected: {task.error}"
-            })
-
-            return state
-
-        async def handle_error(state: GraphState) -> GraphState:
-            """Handle task error."""
-            task = state.task
-            logger.error(f"Handling error for task {task.task_id}: {task.error}")
-
-            # Update task status
-            task.status = TaskStatus.FAILED
-            task.updated_at = format_timestamp()
-
-            # Add a message
-            state.messages.append({
-                "role": "system",
-                "content": f"Task {task.task_id} failed: {task.error}"
-            })
-
-            return state
-
-        # Create the graph
-        self.workflow = StateGraph(GraphState)
-
-        # Add nodes
-        self.workflow.add_node("analyze_task", analyze_task)
-        self.workflow.add_node("route_task", route_task)
-        self.workflow.add_node("execute_task", execute_task)
-        self.workflow.add_node("request_approval", request_approval)
-        self.workflow.add_node("check_approval", check_approval)
-        self.workflow.add_node("wait_for_approval", wait_for_approval)
-        self.workflow.add_node("handle_rejection", handle_rejection)
-        self.workflow.add_node("handle_error", handle_error)
-
-        # Add edges
-        self.workflow.add_edge("analyze_task", "route_task")
-        self.workflow.add_edge("route_task", "execute_task")
-        self.workflow.add_edge("route_task", "request_approval")
-        self.workflow.add_edge("request_approval", "check_approval")
-        self.workflow.add_edge("check_approval", "execute_task")
-        self.workflow.add_edge("check_approval", "wait_for_approval")
-        self.workflow.add_edge("check_approval", "handle_rejection")
-        self.workflow.add_edge("check_approval", "handle_error")
-        self.workflow.add_edge("wait_for_approval", "check_approval")
-        self.workflow.add_edge("execute_task", END)
-        self.workflow.add_edge("handle_rejection", END)
-        self.workflow.add_edge("handle_error", END)
-
-        # Set the entry point
-        self.workflow.set_entry_point("analyze_task")
-
-        # Compile the graph
-        self.compiled_workflow = self.workflow.compile()
-
-    async def create_task(
-        self,
-        title: str,
-        description: str,
-        task_type: str,
-        priority: int = 1,
-        require_hitl: bool = True,
-        parameters: Optional[Dict[str, Any]] = None,
-    ) -> Task:
+    async def add_task(self, task_id: str, priority: TaskPriority, created_at: datetime) -> None:
         """
-        Create a new task.
+        Add a task to the priority queue.
 
         Args:
-            title: The task title.
-            description: The task description.
-            task_type: The type of task.
-            priority: The task priority (1-5).
-            require_hitl: Whether human approval is required.
-            parameters: Task-specific parameters.
-
-        Returns:
-            Task: The created task.
+            task_id: The ID of the task.
+            priority: The priority of the task.
+            created_at: When the task was created.
         """
-        task_id = generate_task_id()
-        now = format_timestamp()
+        logger.info(f"Adding task {task_id} to priority queue with priority {priority}")
 
-        task = Task(
-            task_id=task_id,
-            title=title,
-            description=description,
-            task_type=task_type,
-            status=TaskStatus.PENDING,
-            created_at=now,
-            updated_at=now,
-            priority=priority,
-            require_hitl=require_hitl,
-            parameters=parameters or {},
-        )
+        self.tasks[task_id] = {
+            "priority": priority,
+            "created_at": created_at,
+            "scheduled_at": None,
+        }
 
-        self._tasks[task_id] = task
-        logger.info(f"Created task {task_id}: {title}")
-
-        # Start the workflow in a background task
-        asyncio.create_task(self._run_workflow(task))
-
-        return task
-
-    async def get_task(self, task_id: str) -> Optional[Task]:
+    async def update_priority(self, task_id: str, priority: TaskPriority) -> None:
         """
-        Get a task by ID.
+        Update the priority of a task.
 
         Args:
-            task_id: The task ID.
+            task_id: The ID of the task.
+            priority: The new priority of the task.
+        """
+        if task_id not in self.tasks:
+            raise ValueError(f"Task {task_id} not found in priority queue")
+
+        logger.info(f"Updating task {task_id} priority from {self.tasks[task_id]['priority']} to {priority}")
+        self.tasks[task_id]["priority"] = priority
+
+    async def get_next_task(self) -> Optional[str]:
+        """
+        Get the ID of the next task to process based on priority and creation time.
 
         Returns:
-            Optional[Task]: The task, if found.
+            Optional[str]: The ID of the next task, or None if there are no tasks.
         """
-        return self._tasks.get(task_id)
-
-    async def list_tasks(
-        self, status: Optional[str] = None, limit: int = 10, offset: int = 0
-    ) -> List[Task]:
-        """
-        List tasks with optional filtering.
-
-        Args:
-            status: Optional status filter.
-            limit: Maximum number of tasks to return.
-            offset: Number of tasks to skip.
-
-        Returns:
-            List[Task]: List of tasks.
-        """
-        tasks = list(self._tasks.values())
-
-        # Apply status filter if provided
-        if status:
-            tasks = [task for task in tasks if task.status == status]
-
-        # Sort by created_at (newest first)
-        tasks.sort(key=lambda x: x.created_at, reverse=True)
-
-        # Apply pagination
-        return tasks[offset:offset + limit]
-
-    async def cancel_task(self, task_id: str) -> Optional[Task]:
-        """
-        Cancel a task.
-
-        Args:
-            task_id: The task ID.
-
-        Returns:
-            Optional[Task]: The cancelled task, if found.
-        """
-        task = await self.get_task(task_id)
-        if not task:
+        if not self.tasks:
             return None
 
-        # Only cancel if not already completed or failed
-        if task.status not in [
-            TaskStatus.COMPLETED,
-            TaskStatus.FAILED,
-            TaskStatus.CANCELLED,
-        ]:
-            task.status = TaskStatus.CANCELLED
-            task.updated_at = format_timestamp()
-            logger.info(f"Cancelled task {task_id}")
+        # Sort tasks by priority (higher priority first) and then by creation time (older first)
+        priority_order = {
+            TaskPriority.CRITICAL: 0,
+            TaskPriority.HIGH: 1,
+            TaskPriority.MEDIUM: 2,
+            TaskPriority.LOW: 3,
+        }
 
-        return task
+        # Filter out tasks that have already been scheduled
+        available_tasks = {
+            task_id: data for task_id, data in self.tasks.items()
+            if data["scheduled_at"] is None
+        }
 
-    async def _run_workflow(self, task: Task) -> None:
+        if not available_tasks:
+            return None
+
+        # Sort by priority and creation time
+        sorted_tasks = sorted(
+            available_tasks.items(),
+            key=lambda x: (
+                priority_order[x[1]["priority"]],
+                x[1]["created_at"]
+            )
+        )
+
+        # Return the first task ID
+        next_task_id = sorted_tasks[0][0]
+
+        # Mark the task as scheduled
+        self.tasks[next_task_id]["scheduled_at"] = datetime.now()
+
+        logger.info(f"Selected task {next_task_id} with priority {self.tasks[next_task_id]['priority']} for processing")
+        return next_task_id
+
+    async def remove_task(self, task_id: str) -> None:
         """
-        Run the workflow for a task.
+        Remove a task from the priority queue.
 
         Args:
-            task: The task to process.
+            task_id: The ID of the task to remove.
         """
-        try:
-            # Initialize the graph state
-            state = {
-                "task": task,
-                "context": {},
-                "messages": [],
-            }
+        if task_id in self.tasks:
+            logger.info(f"Removing task {task_id} from priority queue")
+            del self.tasks[task_id]
+        else:
+            logger.warning(f"Attempted to remove non-existent task {task_id} from priority queue")
 
-            # Run the workflow
-            logger.info(f"Starting workflow for task {task.task_id}")
-            result = await self.compiled_workflow.ainvoke(state)
+    async def get_queue_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about the current queue.
 
-            # Update the task with the final state
-            final_task = result["task"]
-            self._tasks[task.task_id] = final_task
+        Returns:
+            Dict[str, Any]: Statistics about the queue.
+        """
+        total_tasks = len(self.tasks)
+        scheduled_tasks = sum(1 for data in self.tasks.values() if data["scheduled_at"] is not None)
+        unscheduled_tasks = total_tasks - scheduled_tasks
 
-            logger.info(
-                f"Workflow completed for task {task.task_id} with status {final_task.status}"
-            )
-        except Exception as e:
-            logger.error(f"Error running workflow for task {task.task_id}: {str(e)}")
-            # Update task status to failed
-            task.status = TaskStatus.FAILED
-            task.updated_at = format_timestamp()
-            task.error = str(e)
-            self._tasks[task.task_id] = task
+        priority_counts = {
+            TaskPriority.CRITICAL: sum(1 for data in self.tasks.values() if data["priority"] == TaskPriority.CRITICAL),
+            TaskPriority.HIGH: sum(1 for data in self.tasks.values() if data["priority"] == TaskPriority.HIGH),
+            TaskPriority.MEDIUM: sum(1 for data in self.tasks.values() if data["priority"] == TaskPriority.MEDIUM),
+            TaskPriority.LOW: sum(1 for data in self.tasks.values() if data["priority"] == TaskPriority.LOW),
+        }
 
+        return {
+            "total_tasks": total_tasks,
+            "scheduled_tasks": scheduled_tasks,
+            "unscheduled_tasks": unscheduled_tasks,
+            "priority_counts": priority_counts,
+        }
 
-# Create a global task manager instance
-task_manager = TaskManager()
+class TaskStatusTracker:
+    """
+    Service for tracking task status and updates.
+    """
+
+    def __init__(self):
+        """Initialize the task status tracker."""
+        self.tasks: Dict[str, Dict[str, Any]] = {}
+
+    async def register_task(self, task_id: str, status: TaskStatus) -> None:
+        """
+        Register a new task for status tracking.
+
+        Args:
+            task_id: The ID of the task.
+            status: The initial status of the task.
+        """
+        logger.info(f"Registering task {task_id} with status {status}")
+
+        self.tasks[task_id] = {
+            "status": status,
+            "history": [
+                {
+                    "status": status,
+                    "timestamp": datetime.now(),
+                    "details": "Task registered",
+                }
+            ],
+            "last_updated": datetime.now(),
+        }
+
+    async def update_status(
+        self,
+        task_id: str,
+        status: TaskStatus,
+        details: Optional[str] = None
+    ) -> None:
+        """
+        Update the status of a task.
+
+        Args:
+            task_id: The ID of the task.
+            status: The new status of the task.
+            details: Optional details about the status update.
+        """
+        if task_id not in self.tasks:
+            raise ValueError(f"Task {task_id} not registered for status tracking")
+
+        current_status = self.tasks[task_id]["status"]
+        if current_status == status:
+            logger.debug(f"Task {task_id} status unchanged: {status}")
+            return
+
+        logger.info(f"Updating task {task_id} status from {current_status} to {status}")
+
+        self.tasks[task_id]["status"] = status
+        self.tasks[task_id]["last_updated"] = datetime.now()
+
+        # Add to history
+        self.tasks[task_id]["history"].append({
+            "status": status,
+            "timestamp": datetime.now(),
+            "details": details or f"Status changed from {current_status} to {status}",
+        })
+
+    async def get_status(self, task_id: str) -> TaskStatus:
+        """
+        Get the current status of a task.
+
+        Args:
+            task_id: The ID of the task.
+
+        Returns:
+            TaskStatus: The current status of the task.
+        """
+        if task_id not in self.tasks:
+            raise ValueError(f"Task {task_id} not registered for status tracking")
+
+        return self.tasks[task_id]["status"]
+
+    async def get_status_history(self, task_id: str) -> List[Dict[str, Any]]:
+        """
+        Get the status history of a task.
+
+        Args:
+            task_id: The ID of the task.
+
+        Returns:
+            List[Dict[str, Any]]: The status history of the task.
+        """
+        if task_id not in self.tasks:
+            raise ValueError(f"Task {task_id} not registered for status tracking")
+
+        return self.tasks[task_id]["history"]
+
+    async def is_task_completed(self, task_id: str) -> bool:
+        """
+        Check if a task is completed.
+
+        Args:
+            task_id: The ID of the task.
+
+        Returns:
+            bool: True if the task is completed, False otherwise.
+        """
+        if task_id not in self.tasks:
+            raise ValueError(f"Task {task_id} not registered for status tracking")
+
+        return self.tasks[task_id]["status"] == TaskStatus.COMPLETED
+
+    async def is_task_failed(self, task_id: str) -> bool:
+        """
+        Check if a task has failed.
+
+        Args:
+            task_id: The ID of the task.
+
+        Returns:
+            bool: True if the task has failed, False otherwise.
+        """
+        if task_id not in self.tasks:
+            raise ValueError(f"Task {task_id} not registered for status tracking")
+
+        return self.tasks[task_id]["status"] == TaskStatus.FAILED

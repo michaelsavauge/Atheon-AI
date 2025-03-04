@@ -2,21 +2,35 @@
 
 # This script runs just the backend services with Doppler for environment variables
 
-# Check if doppler is installed
+# Check if Doppler CLI is installed
 if ! command -v doppler &> /dev/null; then
-    echo "Doppler CLI is not installed. Please install it first:"
-    echo "https://docs.doppler.com/docs/install"
+    echo "Error: Doppler CLI is not installed or not in PATH"
+    echo "Install Doppler CLI following instructions at: https://docs.doppler.com/docs/cli"
     exit 1
 fi
 
-# Run the docker-compose command with Doppler
-echo "Starting backend services with Doppler..."
+# Check if doppler is configured for this project
+if ! doppler configure verify --no-read-env &> /dev/null; then
+    echo "Doppler is not configured for this project."
+    echo "Please run: doppler setup --project atheon-ai --config dev"
+    exit 1
+fi
+
+echo "Starting backend services with Doppler for secrets management..."
+
+# Start backend services with Doppler injecting environment variables
 doppler run -- docker-compose -f docker-compose.backend.yml up -d
 
+# Check if services started successfully
 echo "Checking service status..."
-docker-compose -f docker-compose.backend.yml ps
+sleep 5
+doppler run -- docker-compose -f docker-compose.backend.yml ps
 
-echo "Backend services started. Use the following commands for logs:"
-echo "  docker-compose -f docker-compose.backend.yml logs -f orchestrator"
-echo "  docker-compose -f docker-compose.backend.yml logs -f postgres"
-echo "  docker-compose -f docker-compose.backend.yml logs -f kafka"
+echo ""
+echo "Backend services are now running with Doppler-managed secrets"
+echo ""
+echo "To view logs for a specific service:"
+echo "doppler run -- docker-compose -f docker-compose.backend.yml logs -f <service-name>"
+echo ""
+echo "To stop all services:"
+echo "doppler run -- docker-compose -f docker-compose.backend.yml down"

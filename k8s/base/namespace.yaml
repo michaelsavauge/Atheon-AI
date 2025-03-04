@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: atheon-ai
+  labels:
+    name: atheon-ai
+    istio-injection: enabled
+    environment: default

@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: atheon-ai
+
+bases:
+  - ../../base
+
+patchesStrategicMerge:
+  - patches/replicas.yaml
+  - patches/resources.yaml
+
+configMapGenerator:
+  - name: env-config
+    literals:
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=debug
+
+secretGenerator:
+  - name: atheon-secrets
+    envs:
+      - secrets/atheon-secrets.env
+  - name: postgres-secrets
+    envs:
+      - secrets/postgres-secrets.env

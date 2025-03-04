@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scraper
+  namespace: atheon-ai
+  labels:
+    app: scraper
+    component: horizontal-agent
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: scraper
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: scraper
+        component: horizontal-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: scraper
+        image: ${DOCKER_REGISTRY}/atheon-scraper:${VERSION}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        - name: KAFKA_TOPIC_IN
+          value: "scrape_requests"
+        - name: KAFKA_TOPIC_OUT
+          value: "scrape_results"
+        - name: KAFKA_GROUP_ID
+          value: "scraper_group"
+        - name: MAX_CONCURRENCY
+          value: "10"
+        - name: USER_AGENT
+          value: "Atheon-AI Web Scraper"
+        - name: LOG_LEVEL
+          value: "info"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      terminationGracePeriodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scraper
+  namespace: atheon-ai
+  labels:
+    app: scraper
+spec:
+  selector:
+    app: scraper
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  type: ClusterIP

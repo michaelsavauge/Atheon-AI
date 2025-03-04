@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-fetcher
+  namespace: atheon-ai
+  labels:
+    app: data-fetcher
+    component: horizontal-agent
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: data-fetcher
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: data-fetcher
+        component: horizontal-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: data-fetcher
+        image: ${DOCKER_REGISTRY}/atheon-data-fetcher:${VERSION}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8081
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        - name: KAFKA_TOPIC_IN
+          value: "data_fetch_requests"
+        - name: KAFKA_TOPIC_OUT
+          value: "data_fetch_results"
+        - name: KAFKA_GROUP_ID
+          value: "data_fetcher_group"
+        - name: API_REQUEST_TIMEOUT
+          value: "30"
+        - name: POLL_INTERVAL
+          value: "1000"
+        - name: LOG_LEVEL
+          value: "info"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      terminationGracePeriodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-fetcher
+  namespace: atheon-ai
+  labels:
+    app: data-fetcher
+spec:
+  selector:
+    app: data-fetcher
+  ports:
+  - port: 8081
+    targetPort: 8081
+    name: http
+  type: ClusterIP

@@ -1,0 +1,5 @@
+# Ignore actual secret files
+secrets/*.env
+
+# Keep example files
+!secrets/*.example

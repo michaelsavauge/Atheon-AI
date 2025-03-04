@@ -1,16 +1,21 @@
 version: '3.8'
 
+# This docker-compose file is configured to work with Doppler for secrets management
+# Always run with: doppler run -- docker-compose up -d
+# This ensures all necessary environment variables are injected from Doppler
+
 services:
   orchestrator:
     build:
       context: ./backend/orchestrator
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     volumes:
       - ./backend/orchestrator:/app
     environment:
-      # Examples of environment variables that will be loaded via Doppler
+      # These environment variables will be loaded from Doppler
+      # Do not hardcode any values here
       - DATABASE_URL
       - KAFKA_BOOTSTRAP_SERVERS
       - JWT_SECRET
@@ -18,12 +23,15 @@ services:
       - ANTHROPIC_API_KEY
       - HUGGINGFACE_API_KEY
       - LOG_LEVEL
+      - REDIS_URL=redis://redis:6379/0
     env_file:
       - .env # This will be populated by Doppler when running with doppler run
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_started
+      redis:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -32,6 +40,66 @@ services:
       retries: 3
       start_period: 40s
     restart: unless-stopped
+    networks:
+      - atheon-network
+
+  scraper:
+    build:
+      context: ./backend/agents/scraper
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/agents/scraper:/app
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC_IN=scrape_requests
+      - KAFKA_TOPIC_OUT=scrape_results
+      - KAFKA_GROUP_ID=scraper_group
+      - MAX_CONCURRENCY=10
+      - USER_AGENT=Atheon-AI Web Scraper
+      - LOG_LEVEL=info
+    depends_on:
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - atheon-network
+
+  data_fetcher:
+    build:
+      context: ./backend/agents/data_fetcher
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./backend/agents/data_fetcher:/app
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC_IN=data_fetch_requests
+      - KAFKA_TOPIC_OUT=data_fetch_results
+      - KAFKA_GROUP_ID=data_fetcher_group
+      - API_REQUEST_TIMEOUT=30
+      - POLL_INTERVAL=1000
+      - LOG_LEVEL=info
+    depends_on:
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - atheon-network
 
   frontend:
     build:
@@ -52,6 +120,8 @@ services:
       orchestrator:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - atheon-network
 
   postgres:
     image: postgres:15
@@ -71,6 +141,25 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+    networks:
+      - atheon-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - atheon-network
 
   kafka:
     image: bitnami/kafka:latest
@@ -94,6 +183,8 @@ services:
       retries: 3
       start_period: 30s
     restart: unless-stopped
+    networks:
+      - atheon-network
 
   adminer:
     image: adminer
@@ -103,6 +194,8 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - atheon-network
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -115,7 +208,14 @@ services:
       kafka:
         condition: service_started
     restart: unless-stopped
+    networks:
+      - atheon-network
 
 volumes:
   postgres_data:
   kafka_data:
+  redis_data:
+
+networks:
+  atheon-network:
+    driver: bridge
