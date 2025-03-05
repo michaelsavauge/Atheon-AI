@@ -1,0 +1,56 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agents-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      component: backend
+      app: in-scraper, data-fetcher, summarizer
+  policyTypes:
+  - Ingress
+  - Egress
+
+  # Allow incoming traffic from orchestrator only
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: orchestrator
+    ports:
+    - port: 8080
+      protocol: TCP
+
+  # Allow outgoing traffic to required services
+  egress:
+  # Allow Kafka communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app: kafka
+    ports:
+    - port: 9092
+      protocol: TCP
+
+  # Allow communication back to orchestrator
+  - to:
+    - podSelector:
+        matchLabels:
+          app: orchestrator
+    ports:
+    - port: 8080
+      protocol: TCP
+
+  # Allow external API calls for data fetching and web scraping
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - port: 80
+      protocol: TCP
+    - port: 443
+      protocol: TCP

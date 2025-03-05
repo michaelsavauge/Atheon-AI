@@ -1,11 +1,66 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Common namespace for all resources
+namespace: atheon-ai
+
+# Labels to add to all resources
+commonLabels:
+  app.kubernetes.io/part-of: atheon-ai
+  app.kubernetes.io/managed-by: kustomize
+
+# Annotations to add to all resources
+commonAnnotations:
+  app.kubernetes.io/description: "Atheon AI Multi-Agent Orchestration System"
+
+# Resources to include
 resources:
-  - namespace.yaml
-  - orchestrator-deployment.yaml
-  - scraper-deployment.yaml
-  - data-fetcher-deployment.yaml
-  - postgres-deployment.yaml
-  - redis-deployment.yaml
-  - kafka-deployment.yaml
+  # Deployments
+  - deployments/orchestrator-deployment.yaml
+  - deployments/scraper-deployment.yaml
+  - deployments/data-fetcher-deployment.yaml
+  - deployments/summarizer-deployment.yaml
+  - deployments/frontend-deployment.yaml
+
+  # Services
+  - services/orchestrator-service.yaml
+  - services/scraper-service.yaml
+  - services/data-fetcher-service.yaml
+  - services/summarizer-service.yaml
+  - services/frontend-service.yaml
+
+  # Network Policies
+  - network-policies/default-deny.yaml
+  - network-policies/orchestrator-network-policy.yaml
+  - network-policies/agents-network-policy.yaml
+  - network-policies/frontend-network-policy.yaml
+
+  # ConfigMaps
+  - configmaps/app-config.yaml
+
+  # Secrets are referenced but not included (managed by Doppler)
+  # - secrets/db-secrets.yaml
+  # - secrets/app-secrets.yaml
+  # - secrets/api-secrets.yaml
+
+# ConfigMap Generators
+configMapGenerator:
+  - name: atheon-config
+    literals:
+      - ENVIRONMENT=base
+      - LOG_LEVEL=info
+
+# Secret Generators - Empty placeholders, actual secrets will be injected by Doppler
+secretGenerator:
+  - name: atheon-secrets
+    type: Opaque
+    options:
+      disableNameSuffixHash: true
+  - name: postgres-secrets
+    type: Opaque
+    options:
+      disableNameSuffixHash: true
+  - name: llm-secrets
+    type: Opaque
+    options:
+      disableNameSuffixHash: true

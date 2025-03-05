@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Reference the base directory
+resources:
+- ../../base
+
+# Change the namespace for development
+namespace: atheon-ai-dev
+
+# Set the namePrefix to avoid collisions with other environments
+namePrefix: dev-
+
+# Add environment-specific labels
+commonLabels:
+  environment: development
+
+# ConfigMap patches for development environment
+configMapGenerator:
+- name: atheon-config
+  behavior: merge
+  literals:
+  - ENVIRONMENT=development
+  - LOG_LEVEL=debug
+
+# Patches to customize resources for development
+patches:
+- path: patches/replicas-patch.yaml
+- path: patches/resources-patch.yaml
+
+# Customize container images for development
+images:
+- name: ${REGISTRY_URL}/atheon-ai/orchestrator
+  newName: ${REGISTRY_URL}/atheon-ai/orchestrator
+  newTag: latest
+- name: ${REGISTRY_URL}/atheon-ai/scraper
+  newName: ${REGISTRY_URL}/atheon-ai/scraper
+  newTag: latest
+- name: ${REGISTRY_URL}/atheon-ai/data-fetcher
+  newName: ${REGISTRY_URL}/atheon-ai/data-fetcher
+  newTag: latest
+- name: ${REGISTRY_URL}/atheon-ai/summarizer
+  newName: ${REGISTRY_URL}/atheon-ai/summarizer
+  newTag: latest
+- name: ${REGISTRY_URL}/atheon-ai/frontend
+  newName: ${REGISTRY_URL}/atheon-ai/frontend
+  newTag: latest

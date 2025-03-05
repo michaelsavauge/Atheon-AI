@@ -1,4 +1,4 @@
-# Atheon AI - Orchestrator Service Dockerfile
+# Atheon AI - Python Agent Template Dockerfile
 # Multi-stage build for optimized production image
 
 # ====== Build Stage ======
@@ -29,7 +29,40 @@ RUN poetry install --no-dev --no-interaction --no-ansi
 
 # Copy source code
 COPY src/ /app/src/
-COPY alembic.ini /app/
+
+# ====== Development Stage ======
+FROM python:3.11-slim AS development
+
+# Set work directory
+WORKDIR /app
+
+# Set Python to run in unbuffered mode
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Install development dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python3 -
+ENV PATH="${PATH}:/root/.local/bin"
+
+# Configure poetry to create a venv inside the project directory
+RUN poetry config virtualenvs.in-project true
+
+# Expose port
+EXPOSE 8082
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8082}/health || exit 1
+
+# Default command to run development server
+CMD ["poetry", "run", "python", "-m", "src.agent"]
 
 # ====== Runtime Stage ======
 FROM python:3.11-slim AS runtime
@@ -56,7 +89,6 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copy only the necessary application files
 COPY --from=builder /app/src /app/src
-COPY --from=builder /app/alembic.ini /app/
 COPY --from=builder --chown=atheon:atheon /app/poetry.lock /app/pyproject.toml /app/
 
 # Create directory for logs
@@ -69,14 +101,14 @@ ENV PATH="/app/.venv/bin:$PATH"
 USER atheon
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8082
 
 # Use tini as entrypoint
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8082}/health || exit 1
 
-# Run gunicorn with uvicorn workers
-CMD ["gunicorn", "src.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+# Run the agent
+CMD ["python", "-m", "src.agent"]

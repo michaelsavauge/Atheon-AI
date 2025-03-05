@@ -1,0 +1,24 @@
+Architecture Diagram Placeholder
+
+This is a placeholder for the Atheon AI architecture diagram.
+An actual diagram should be created using a tool like draw.io, Lucidchart, or Mermaid and saved as architecture.png in this directory.
+
+The diagram should include:
+
+1. Orchestrator (Vertical Agent)
+2. Specialized Agents (Horizontal Agents):
+   - Scraper Agent (Go)
+   - Data Fetcher Agent (Rust)
+   - Summarizer Agent (Python)
+   - Transcription Agent (Python)
+3. Frontend (Next.js)
+4. Infrastructure Components:
+   - Kafka
+   - PostgreSQL
+   - Redis
+   - Prometheus/Grafana
+5. Communication flows between components
+6. Human-in-the-loop integration
+7. Kubernetes deployment architecture
+
+The diagram should be clear, visually appealing, and easy to understand for new contributors to the project.

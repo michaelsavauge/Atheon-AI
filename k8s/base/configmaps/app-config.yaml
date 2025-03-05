@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  # Logging configuration
+  logging.yaml: |
+    version: 1
+    formatters:
+      json:
+        format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: json
+        stream: ext://sys.stdout
+    loggers:
+      orchestrator:
+        level: INFO
+        handlers: [console]
+        propagate: no
+      agents:
+        level: INFO
+        handlers: [console]
+        propagate: no
+    root:
+      level: INFO
+      handlers: [console]
+
+  # Agent configuration
+  agent-config.yaml: |
+    scraper:
+      max_concurrent_jobs: 10
+      timeout_seconds: 30
+      user_agents:
+        - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15"
+
+    data_fetcher:
+      max_concurrent_jobs: 20
+      timeout_seconds: 15
+      retry_attempts: 3
+      retry_delay_ms: 500
+
+    summarizer:
+      max_tokens: 4000
+      model: "gpt-4"
+      fallback_model: "llama-2-70b"
+      temperature: 0.1
+
+  # Kafka topics configuration
+  kafka-topics.yaml: |
+    topics:
+      - name: task-events
+        partitions: 6
+        replication: 3
+        retention.ms: 604800000  # 7 days
+      - name: agent-commands
+        partitions: 12
+        replication: 3
+        retention.ms: 86400000   # 24 hours
+      - name: agent-responses
+        partitions: 12
+        replication: 3
+        retention.ms: 86400000   # 24 hours
+      - name: dead-letter-queue
+        partitions: 1
+        replication: 3
+        retention.ms: 2592000000 # 30 days

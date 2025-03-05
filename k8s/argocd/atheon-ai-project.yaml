@@ -1,0 +1,64 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: atheon-ai
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Atheon AI Multi-Agent Orchestration System
+
+  # Project sources
+  sourceRepos:
+  - 'https://github.com/your-org/atheon-ai.git'
+
+  # Destinations that applications within this project can deploy to
+  destinations:
+  - namespace: atheon-ai-dev
+    server: https://kubernetes.default.svc
+  - namespace: atheon-ai-staging
+    server: https://kubernetes.default.svc
+  - namespace: atheon-ai-prod
+    server: https://kubernetes.default.svc
+
+  # Cluster resources that applications in this project can use
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: Namespace
+
+  # Namespace resources that applications in this project can use
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  # Namespace resource blacklist
+  namespaceResourceBlacklist:
+  - group: ''
+    kind: ResourceQuota
+  - group: ''
+    kind: LimitRange
+
+  # Enables project orphaned resource monitoring
+  orphanedResources:
+    warn: true
+    ignore:
+    - group: apps
+      kind: Deployment
+      name: monitoring-tools
+
+  # Roles for this project
+  roles:
+  - name: developer
+    description: Developer role for Atheon AI project
+    policies:
+    - p, proj:atheon-ai:developer, applications, get, atheon-ai/*, allow
+    - p, proj:atheon-ai:developer, applications, sync, atheon-ai/*, allow
+    groups:
+    - atheon-ai-developers
+
+  - name: admin
+    description: Admin role for Atheon AI project
+    policies:
+    - p, proj:atheon-ai:admin, applications, *, atheon-ai/*, allow
+    groups:
+    - atheon-ai-admins

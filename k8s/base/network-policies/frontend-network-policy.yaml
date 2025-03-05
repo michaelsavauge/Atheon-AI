@@ -1,0 +1,44 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+      component: frontend
+  policyTypes:
+  - Ingress
+  - Egress
+
+  # Allow incoming traffic from ingress controller and other services
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - port: 3000
+      protocol: TCP
+
+  # Allow outgoing traffic to API (orchestrator)
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: orchestrator
+    ports:
+    - port: 8080
+      protocol: TCP
+
+  # Allow outgoing traffic for assets (like fonts, images)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - port: 443
+      protocol: TCP

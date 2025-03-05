@@ -1,0 +1,49 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: orchestrator-pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: orchestrator
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: scraper-pdb
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: scraper
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: data-fetcher-pdb
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: data-fetcher
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: summarizer-pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: summarizer
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend-pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: frontend

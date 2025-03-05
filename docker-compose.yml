@@ -1,88 +1,373 @@
 version: '3.8'
 
+# Atheon AI - Complete Docker Compose Setup
+# Includes all services with Doppler integration for secrets management
+# Usage: doppler run -- docker-compose up -d
+
 services:
-  # Orchestrator Service (Python)
+  #============================================================================
+  # Backend Services
+  #============================================================================
+
+  # Orchestrator service (Python/FastAPI/LangGraph)
   orchestrator:
     build:
       context: ./backend/orchestrator
       dockerfile: Dockerfile
+      target: development
+    image: ghcr.io/atheon-ai/orchestrator:${TAG:-latest}
+    container_name: atheon-orchestrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: ["doppler", "run", "--"]
+    command: >
+      sh -c "
+        python -m alembic upgrade head &&
+        python -m uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+      "
     ports:
       - "8000:8000"
     volumes:
       - ./backend/orchestrator:/app
+      - orchestrator_cache:/app/.cache
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/atheon
+      - SERVICE_NAME=orchestrator
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    healthcheck:
+      test: curl -f http://localhost:8000/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # Scraper agent service (Go/Colly)
+  scraper:
+    build:
+      context: ./backend/agents/go_agent_template
+      dockerfile: Dockerfile
+      target: builder
+    image: ghcr.io/atheon-ai/scraper:${TAG:-latest}
+    container_name: atheon-scraper
     depends_on:
-      - kafka
-      - db
-    networks:
-      - atheon-network
-
-  # Kafka for Message Queue
-  kafka:
-    image: bitnami/kafka:latest
-    ports:
-      - "9092:9092"
-    environment:
-      - KAFKA_CFG_NODE_ID=0
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - ALLOW_PLAINTEXT_LISTENER=yes
-    volumes:
-      - kafka_data:/bitnami/kafka
-    networks:
-      - atheon-network
-
-  # Kafka UI for Management
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+      kafka:
+        condition: service_healthy
+    entrypoint: ["doppler", "run", "--"]
+    command: ["go", "run", "main.go"]
     ports:
       - "8080:8080"
-    environment:
-      - KAFKA_CLUSTERS_0_NAME=atheon-kafka
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-    depends_on:
-      - kafka
-    networks:
-      - atheon-network
-
-  # PostgreSQL Database
-  db:
-    image: postgres:15
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=atheon
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./backend/agents/go_agent_template:/app
+    environment:
+      - SERVICE_NAME=scraper
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+    healthcheck:
+      test: curl -f http://localhost:8080/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 512M
 
-  # Frontend Development Server
+  # Data fetcher agent service (Rust/Tokio)
+  data_fetcher:
+    build:
+      context: ./backend/agents/rust_agent_template
+      dockerfile: Dockerfile
+      target: builder
+    image: ghcr.io/atheon-ai/data-fetcher:${TAG:-latest}
+    container_name: atheon-data-fetcher
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["doppler", "run", "--"]
+    command: cargo run --bin rust_agent_template
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./backend/agents/rust_agent_template:/usr/src/app
+      - data_fetcher_cache:/usr/src/app/target
+    environment:
+      - SERVICE_NAME=data_fetcher
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+    healthcheck:
+      test: curl -f http://localhost:8081/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 512M
+
+  # Summarization agent service (Python)
+  summarizer:
+    build:
+      context: ./backend/agents/python_agent_template
+      dockerfile: Dockerfile
+      target: development
+    image: ghcr.io/atheon-ai/summarizer:${TAG:-latest}
+    container_name: atheon-summarizer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["doppler", "run", "--"]
+    command: python -m src.agent
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./backend/agents/python_agent_template:/app
+      - summarizer_cache:/app/.cache
+    environment:
+      - SERVICE_NAME=summarizer
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - AGENT_NAME=summarizer
+      - AGENT_INPUT_TOPIC=summarization_requests
+      - AGENT_OUTPUT_TOPIC=summarization_results
+      - PORT=8082
+    healthcheck:
+      test: curl -f http://localhost:8082/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+  #============================================================================
+  # Frontend Service
+  #============================================================================
+
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+      target: development
+    image: ghcr.io/atheon-ai/frontend:${TAG:-latest}
+    container_name: atheon-frontend
+    entrypoint: ["doppler", "run", "--"]
+    command: npm run dev
     ports:
       - "3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
     environment:
+      - SERVICE_NAME=frontend
+      - ENVIRONMENT=development
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+    healthcheck:
+      test: wget -q -O - http://localhost:3000/api/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 512M
+
+  #============================================================================
+  # Infrastructure Services
+  #============================================================================
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: atheon-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/init-data.sql:/docker-entrypoint-initdb.d/02-init-data.sql
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-atheon}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-atheon123}
+      - POSTGRES_DB=${POSTGRES_DB:-atheon}
+    healthcheck:
+      test: pg_isready -U ${POSTGRES_USER:-atheon} -d ${POSTGRES_DB:-atheon}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: atheon-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-atheon123}
+    healthcheck:
+      test: redis-cli -a ${REDIS_PASSWORD:-atheon123} ping | grep PONG
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+
+  # Kafka for message processing
+  kafka:
+    image: bitnami/kafka:3.5
+    container_name: atheon-kafka
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/bitnami/kafka
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    healthcheck:
+      test: kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # Kafka UI for managing and monitoring Kafka
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: atheon-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8090:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=atheon
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+    networks:
+      - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+
+  # Adminer for database management
+  adminer:
+    image: adminer:latest
+    container_name: atheon-adminer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8091:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    networks:
+      - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: atheon-jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - atheon-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 512M
 
 networks:
   atheon-network:
     driver: bridge
 
 volumes:
-  kafka_data:
   postgres_data:
+  redis_data:
+  kafka_data:
+  orchestrator_cache:
+  summarizer_cache:
+  data_fetcher_cache:

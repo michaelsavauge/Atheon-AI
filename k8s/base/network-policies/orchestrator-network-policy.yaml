@@ -1,0 +1,82 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: orchestrator-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: orchestrator
+  policyTypes:
+  - Ingress
+  - Egress
+
+  # Allow incoming traffic from API Gateway and other services
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          component: api-gateway
+    ports:
+    - port: 8080
+      protocol: TCP
+    - port: 8081
+      protocol: TCP
+
+  # Allow communication with other agents
+  - from:
+    - podSelector:
+        matchLabels:
+          component: backend
+    ports:
+    - port: 8080
+      protocol: TCP
+
+  # Allow outgoing traffic to required services
+  egress:
+  # Allow Kafka communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app: kafka
+    ports:
+    - port: 9092
+      protocol: TCP
+
+  # Allow PostgreSQL communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - port: 5432
+      protocol: TCP
+
+  # Allow Redis communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - port: 6379
+      protocol: TCP
+
+  # Allow communication to all agent services
+  - to:
+    - podSelector:
+        matchLabels:
+          component: backend
+    ports:
+    - port: 8080
+      protocol: TCP
+
+  # Allow external LLM API calls
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - port: 443
+      protocol: TCP

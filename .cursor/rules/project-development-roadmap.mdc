@@ -1,6 +1,6 @@
 ---
-description: Follow these 10 phases of development step by step in order when building this project 
-globs: `.py, .go, .rs, .tsx, .ts, .css, .json, .yaml,`  `.yml, .md, .sql, .toml, .js, .env,` `.dockerfile,`  `Dockerfile, .gitignore, .jsx` 
+description: Follow these 10 phases of development step by step in order when building this project
+globs: `.py, .go, .rs, .tsx, .ts, .css, .json, .yaml,`  `.yml, .md, .sql, .toml, .js, .env,` `.dockerfile,`  `Dockerfile, .gitignore, .jsx`
 alwaysApply: false
 ---
 # AI Agent Orchestration System: Build Roadmap
@@ -28,7 +28,7 @@ alwaysApply: false
 ## Phase 2: Orchestrator Development
 
 4. **Vertical Agent Implementation**
-   - Develop the main orchestrator service 
+   - Develop the main orchestrator service
    - Implement LangGraph for multi-agent orchestration
    - Create task breakdown and routing logic
    - Build API endpoints with FastAPI
@@ -114,7 +114,7 @@ alwaysApply: false
     - Configure MFA for administrative access
 
 17. **End-to-End Encryption**
-    - Lets address this process at the end, we will wrap the whole project in an encryption layer at the end so that way the encryption doesnt impede performance or compatability issues. 
+    - Lets address this process at the end, we will wrap the whole project in an encryption layer at the end so that way the encryption doesnt impede performance or compatability issues.
 
 18. **Logging & Monitoring**
     - Set up centralized logging with ELK stack

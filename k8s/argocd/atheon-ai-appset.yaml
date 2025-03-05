@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: atheon-ai-services
+  namespace: argocd
+spec:
+  generators:
+  - matrix:
+      generators:
+      - list:
+          elements:
+          - service: orchestrator
+          - service: scraper
+          - service: data-fetcher
+          - service: summarizer
+          - service: frontend
+      - list:
+          elements:
+          - environment: development
+            namespace: atheon-ai-dev
+            path: k8s/overlays/development
+          - environment: staging
+            namespace: atheon-ai-staging
+            path: k8s/overlays/staging
+          - environment: production
+            namespace: atheon-ai-prod
+            path: k8s/overlays/production
+  template:
+    metadata:
+      name: '{{service}}-{{environment}}'
+      namespace: argocd
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+      labels:
+        app.kubernetes.io/name: '{{service}}'
+        app.kubernetes.io/part-of: atheon-ai
+        environment: '{{environment}}'
+    spec:
+      project: atheon-ai
+      source:
+        repoURL: https://github.com/your-org/atheon-ai.git
+        targetRevision: HEAD
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+        - CreateNamespace=true
+        - PruneLast=true
+        - ApplyOutOfSyncOnly=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        jsonPointers:
+        - /spec/replicas
+      - group: autoscaling
+        kind: HorizontalPodAutoscaler
+        jsonPointers:
+        - /spec/metrics

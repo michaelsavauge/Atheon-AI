@@ -1,0 +1,49 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Reference the base directory
+resources:
+- ../../base
+
+# Change the namespace for production
+namespace: atheon-ai-prod
+
+# Set the namePrefix to avoid collisions with other environments
+namePrefix: prod-
+
+# Add environment-specific labels
+commonLabels:
+  environment: production
+
+# ConfigMap patches for production environment
+configMapGenerator:
+- name: atheon-config
+  behavior: merge
+  literals:
+  - ENVIRONMENT=production
+  - LOG_LEVEL=info
+
+# Patches to customize resources for production (high availability)
+patches:
+- path: patches/replicas-patch.yaml
+- path: patches/resources-patch.yaml
+- path: patches/hpa-patch.yaml
+- path: patches/pdb-patch.yaml
+
+# Customize container images for production
+images:
+- name: ${REGISTRY_URL}/atheon-ai/orchestrator
+  newName: ${REGISTRY_URL}/atheon-ai/orchestrator
+  newTag: ${RELEASE_VERSION}
+- name: ${REGISTRY_URL}/atheon-ai/scraper
+  newName: ${REGISTRY_URL}/atheon-ai/scraper
+  newTag: ${RELEASE_VERSION}
+- name: ${REGISTRY_URL}/atheon-ai/data-fetcher
+  newName: ${REGISTRY_URL}/atheon-ai/data-fetcher
+  newTag: ${RELEASE_VERSION}
+- name: ${REGISTRY_URL}/atheon-ai/summarizer
+  newName: ${REGISTRY_URL}/atheon-ai/summarizer
+  newTag: ${RELEASE_VERSION}
+- name: ${REGISTRY_URL}/atheon-ai/frontend
+  newName: ${REGISTRY_URL}/atheon-ai/frontend
+  newTag: ${RELEASE_VERSION}
